@@ -24,7 +24,7 @@ async function startServer() {
   // Airtable configuration
   const apiKey = process.env.AIRTABLE_API_KEY;
   const baseId = process.env.AIRTABLE_BASE_ID;
-  
+
   if (!apiKey || !baseId) {
     console.error("CRITICAL ERROR: AIRTABLE_API_KEY or AIRTABLE_BASE_ID is not set in the environment.");
   }
@@ -75,7 +75,7 @@ async function startServer() {
   app.post("/api/auth/register", async (req, res) => {
     try {
       const { email, password } = req.body;
-      
+
       if (!email || !password) {
         return res.status(400).json({ error: "Email and password are required" });
       }
@@ -106,7 +106,7 @@ async function startServer() {
 
       const token = jwt.sign({ id: record[0].id, email }, JWT_SECRET, { expiresIn: '7d' });
 
-      res.status(201).json({ 
+      res.status(201).json({
         message: "User registered successfully",
         token,
         user: { id: record[0].id, email }
@@ -169,7 +169,7 @@ async function startServer() {
     try {
       const formData = req.body;
       const { public_id: existingPublicId, ...profileData } = formData;
-      
+
       // Clean formData to remove empty strings and undefined values
       const cleanFormData = Object.fromEntries(
         Object.entries(profileData).filter(([k, v]) => v !== '' && v !== null && v !== undefined && !readOnlyFields.includes(k))
@@ -200,7 +200,7 @@ async function startServer() {
                 fields: mappedData
               }
             ]);
-            
+
             // Use APP_URL in AI Studio preview, otherwise use PUBLIC_BASE_URL or host
             const baseUrl = process.env.APP_URL || process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
             return res.json({
@@ -248,18 +248,18 @@ async function startServer() {
     } catch (error: any) {
       console.error("Error creating profile in Airtable:", error);
       console.error("Error details:", JSON.stringify(error, null, 2));
-      
+
       let errorMessage = "Failed to create profile";
       if (error.error === 'NOT_FOUND') {
         errorMessage = "Airtable Base ID or Table Name not found, or API key lacks access.";
       }
-      
+
       res.status(500).json({ error: errorMessage, details: error.message || error });
     }
   });
 
   // API endpoint to get a profile by public_id
-  app.get("/api/profile/:public_id", async (req, res) => {
+  app.get("/:public_id", async (req, res) => {
     try {
       const { public_id } = req.params;
 
@@ -308,7 +308,7 @@ async function startServer() {
   });
 
   // API endpoint to download vCard directly
-  app.get("/api/profile/:public_id/vcard", async (req, res) => {
+  app.get("/:public_id/vcard", async (req, res) => {
     try {
       const { public_id } = req.params;
 
@@ -405,12 +405,19 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static("dist"));
+    app.use(express.static(path.join(__dirname, "dist")));
+
+    app.get("*", (req, res) => {
+      if (req.path.startsWith("/api/")) {
+        return res.status(404).send("API route not found");
+      }
+
+      res.sendFile(path.join(__dirname, "dist", "index.html"));
+    });
   }
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
-}
 
-startServer();
+  startServer();
