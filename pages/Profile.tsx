@@ -12,7 +12,7 @@ const Profile: React.FC = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const response = await fetch(`/api/perfil/${public_id}`);
+        const response = await fetch(`/api/profile/${public_id}`);
         if (!response.ok) {
           throw new Error('Profile not found');
         }
@@ -42,8 +42,8 @@ const Profile: React.FC = () => {
     return (
       <div className="min-h-screen bg-[#0F1022] flex items-center justify-center text-[#FAF7F5]">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-2">Perfil no encontrado</h2>
-          <p className="text-[#FAF7F5]/60">El enlace que has seguido no es válido o ha expirado.</p>
+          <h2 className="text-2xl font-bold mb-2">Profile not found</h2>
+          <p className="text-[#FAF7F5]/60">The link you followed is invalid or has expired.</p>
         </div>
       </div>
     );
@@ -73,11 +73,11 @@ const Profile: React.FC = () => {
 
           {/* Action Button */}
           <a
-            href={`/api/perfil/${public_id}/vcard`}
+            href={`/api/profile/${public_id}/vcard`}
             className="w-full py-4 bg-[#D61E51] text-white font-black text-sm rounded-2xl flex items-center justify-center gap-2 hover:bg-[#b51844] transition-all shadow-lg uppercase tracking-widest"
           >
             <Download size={18} />
-            Añadir Contacto
+            Add Contact
           </a>
         </div>
       </div>

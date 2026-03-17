@@ -6,8 +6,8 @@ import { VCardData } from '../types';
  * Appends relationship, custom notes, and a Google Maps link to the NOTE field for context.
  */
 export const generateVCardString = (data: VCardData): string => {
-  const relationshipContext = data.relationship ? `Conocido por: ${data.relationship}` : '';
-  const userNoteContext = data.customNote ? `Recuérdame: ${data.customNote}` : '';
+  const relationshipContext = data.relationship ? `Met at: ${data.relationship}` : '';
+  const userNoteContext = data.customNote ? `Remember me: ${data.customNote}` : '';
   
   const combinedNotes = [
     relationshipContext,
@@ -34,7 +34,7 @@ export const generateVCardString = (data: VCardData): string => {
     fullPhoneMobile ? `TEL;TYPE=CELL,VOICE:${fullPhoneMobile}` : '',
     data.street || data.city || data.state || data.zip || data.country ? `ADR;TYPE=WORK:;;${data.street || ''};${data.city || ''};${data.state || ''};${data.zip || ''};${data.country || ''}` : '',
     mapsUrl ? `item1.URL:${mapsUrl}` : '',
-    mapsUrl ? `item1.X-ABLabel:Como llegar` : '',
+    mapsUrl ? `item1.X-ABLabel:Directions` : '',
     data.linkedin ? `X-SOCIALPROFILE;TYPE=linkedin:${data.linkedin}` : '',
     data.instagram ? `X-SOCIALPROFILE;TYPE=instagram:${data.instagram}` : '',
     data.x ? `X-SOCIALPROFILE;TYPE=twitter:${data.x}` : '',

@@ -30,9 +30,9 @@ async function startServer() {
   }
 
   const base = new Airtable({ apiKey: apiKey || 'dummy_key' }).base(baseId || 'dummy_base');
-  const tablePerfiles = process.env.AIRTABLE_TABLE_PERFILES || 'Perfiles';
-  const tableSistema = process.env.AIRTABLE_TABLE_SISTEMA || 'Perfil_Sistema';
-  const tableUsuarios = process.env.AIRTABLE_TABLE_USUARIOS || 'Usuarios';
+  const profilesTable = process.env.AIRTABLE_TABLE_PERFILES || 'Perfiles';
+  const systemTable = process.env.AIRTABLE_TABLE_SISTEMA || 'Perfil_Sistema';
+  const usersTable = process.env.AIRTABLE_TABLE_USUARIOS || 'Usuarios';
 
   // Field mapping between frontend keys and Airtable column names
   const fieldMapping: Record<string, string> = {
@@ -77,17 +77,17 @@ async function startServer() {
       const { email, password } = req.body;
       
       if (!email || !password) {
-        return res.status(400).json({ error: "Email y contraseña son obligatorios" });
+        return res.status(400).json({ error: "Email and password are required" });
       }
 
       // Check if user exists
-      const existingUsers = await base(tableUsuarios).select({
+      const existingUsers = await base(usersTable).select({
         filterByFormula: `{Email} = '${email}'`,
         maxRecords: 1
       }).firstPage();
 
       if (existingUsers.length > 0) {
-        return res.status(400).json({ error: "Este correo electrónico ya está registrado" });
+        return res.status(400).json({ error: "This email is already registered" });
       }
 
       // Hash password
@@ -95,7 +95,7 @@ async function startServer() {
       const hashedPassword = await bcrypt.hash(password, salt);
 
       // Create user
-      const record = await base(tableUsuarios).create([
+      const record = await base(usersTable).create([
         {
           fields: {
             Email: email,
@@ -107,13 +107,13 @@ async function startServer() {
       const token = jwt.sign({ id: record[0].id, email }, JWT_SECRET, { expiresIn: '7d' });
 
       res.status(201).json({ 
-        message: "Usuario registrado con éxito",
+        message: "User registered successfully",
         token,
         user: { id: record[0].id, email }
       });
     } catch (error: any) {
       console.error("Error registering user:", error);
-      res.status(500).json({ error: "Error interno al registrar usuario" });
+      res.status(500).json({ error: "Internal error registering user" });
     }
   });
 
@@ -122,50 +122,50 @@ async function startServer() {
       const { email, password } = req.body;
 
       if (!email || !password) {
-        return res.status(400).json({ error: "Email y contraseña son obligatorios" });
+        return res.status(400).json({ error: "Email and password are required" });
       }
 
       // Find user
-      const users = await base(tableUsuarios).select({
+      const users = await base(usersTable).select({
         filterByFormula: `{Email} = '${email}'`,
         maxRecords: 1
       }).firstPage();
 
       if (users.length === 0) {
-        return res.status(401).json({ error: "Credenciales incorrectas" });
+        return res.status(401).json({ error: "Invalid credentials" });
       }
 
       const userRecord = users[0];
       const storedPassword = userRecord.get('Password') as string;
 
       if (!storedPassword) {
-        return res.status(401).json({ error: "Credenciales incorrectas" });
+        return res.status(401).json({ error: "Invalid credentials" });
       }
 
       // Verify password
       const isMatch = await bcrypt.compare(password, storedPassword);
 
       if (!isMatch) {
-        return res.status(401).json({ error: "Credenciales incorrectas" });
+        return res.status(401).json({ error: "Invalid credentials" });
       }
 
       const token = jwt.sign({ id: userRecord.id, email }, JWT_SECRET, { expiresIn: '7d' });
 
       res.json({
-        message: "Login exitoso",
+        message: "Login successful",
         token,
         user: { id: userRecord.id, email }
       });
     } catch (error) {
       console.error("Error logging in:", error);
-      res.status(500).json({ error: "Error interno al iniciar sesión" });
+      res.status(500).json({ error: "Internal error logging in" });
     }
   });
 
   // --- VCARD ENDPOINTS ---
 
   // API endpoint to create or update a profile
-  app.post("/api/perfil", async (req, res) => {
+  app.post("/api/profile", async (req, res) => {
     try {
       const formData = req.body;
       const { public_id: existingPublicId, ...profileData } = formData;
@@ -186,17 +186,17 @@ async function startServer() {
 
       // If we already have a public_id, try to update the existing record
       if (existingPublicId) {
-        const sistemaRecords = await base(tableSistema).select({
+        const systemRecords = await base(systemTable).select({
           filterByFormula: `{public_id} = '${existingPublicId}'`,
           maxRecords: 1
         }).firstPage();
 
-        if (sistemaRecords.length > 0) {
-          const perfilIds = sistemaRecords[0].get('Perfil') as string[];
-          if (perfilIds && perfilIds.length > 0) {
-            await base(tablePerfiles).update([
+        if (systemRecords.length > 0) {
+          const profileIds = systemRecords[0].get('Perfil') as string[];
+          if (profileIds && profileIds.length > 0) {
+            await base(profilesTable).update([
               {
-                id: perfilIds[0],
+                id: profileIds[0],
                 fields: mappedData
               }
             ]);
@@ -206,7 +206,7 @@ async function startServer() {
             return res.json({
               public_id: existingPublicId,
               landing_url: `${baseUrl}/${existingPublicId}`,
-              recordIdPerfil: perfilIds[0]
+              profileRecordId: profileIds[0]
             });
           }
         }
@@ -216,18 +216,18 @@ async function startServer() {
       const public_id = generatePublicId();
 
       // Create record in Perfiles
-      const perfilesRecord = await base(tablePerfiles).create([
+      const profilesRecord = await base(profilesTable).create([
         {
           fields: mappedData
         }
       ]);
-      const recordIdPerfil = perfilesRecord[0].id;
+      const profileRecordId = profilesRecord[0].id;
 
       // Create record in Perfil_Sistema
-      await base(tableSistema).create([
+      await base(systemTable).create([
         {
           fields: {
-            Perfil: [recordIdPerfil],
+            Perfil: [profileRecordId],
             public_id: public_id,
             estado_publicacion: "publicado"
           }
@@ -243,7 +243,7 @@ async function startServer() {
       res.json({
         public_id,
         landing_url,
-        recordIdPerfil
+        profileRecordId
       });
     } catch (error: any) {
       console.error("Error creating profile in Airtable:", error);
@@ -259,35 +259,35 @@ async function startServer() {
   });
 
   // API endpoint to get a profile by public_id
-  app.get("/api/perfil/:public_id", async (req, res) => {
+  app.get("/api/profile/:public_id", async (req, res) => {
     try {
       const { public_id } = req.params;
 
       // Find in Perfil_Sistema
-      const sistemaRecords = await base(tableSistema).select({
+      const systemRecords = await base(systemTable).select({
         filterByFormula: `{public_id} = '${public_id}'`,
         maxRecords: 1
       }).firstPage();
 
-      if (sistemaRecords.length === 0) {
+      if (systemRecords.length === 0) {
         return res.status(404).json({ error: "Profile not found" });
       }
 
-      const sistemaRecord = sistemaRecords[0];
-      const perfilIds = sistemaRecord.get('Perfil') as string[];
+      const systemRecord = systemRecords[0];
+      const profileIds = systemRecord.get('Perfil') as string[];
 
-      if (!perfilIds || perfilIds.length === 0) {
+      if (!profileIds || profileIds.length === 0) {
         return res.status(404).json({ error: "Linked profile not found" });
       }
 
-      const recordIdPerfil = perfilIds[0];
+      const profileRecordId = profileIds[0];
 
       // Fetch from Perfiles
-      const perfilRecord = await base(tablePerfiles).find(recordIdPerfil);
+      const profileRecord = await base(profilesTable).find(profileRecordId);
 
       // Map Airtable fields back to frontend keys
       const mappedResponse: any = {};
-      for (const [key, value] of Object.entries(perfilRecord.fields)) {
+      for (const [key, value] of Object.entries(profileRecord.fields)) {
         const frontendKey = reverseFieldMapping[key];
         if (frontendKey) {
           if (frontendKey === 'photo' && Array.isArray(value) && value.length > 0) {
@@ -308,35 +308,35 @@ async function startServer() {
   });
 
   // API endpoint to download vCard directly
-  app.get("/api/perfil/:public_id/vcard", async (req, res) => {
+  app.get("/api/profile/:public_id/vcard", async (req, res) => {
     try {
       const { public_id } = req.params;
 
       // Find in Perfil_Sistema
-      const sistemaRecords = await base(tableSistema).select({
+      const systemRecords = await base(systemTable).select({
         filterByFormula: `{public_id} = '${public_id}'`,
         maxRecords: 1
       }).firstPage();
 
-      if (sistemaRecords.length === 0) {
+      if (systemRecords.length === 0) {
         return res.status(404).json({ error: "Profile not found" });
       }
 
-      const sistemaRecord = sistemaRecords[0];
-      const perfilIds = sistemaRecord.get('Perfil') as string[];
+      const systemRecord = systemRecords[0];
+      const profileIds = systemRecord.get('Perfil') as string[];
 
-      if (!perfilIds || perfilIds.length === 0) {
+      if (!profileIds || profileIds.length === 0) {
         return res.status(404).json({ error: "Linked profile not found" });
       }
 
-      const recordIdPerfil = perfilIds[0];
+      const profileRecordId = profileIds[0];
 
       // Fetch from Perfiles
-      const perfilRecord = await base(tablePerfiles).find(recordIdPerfil);
+      const profileRecord = await base(profilesTable).find(profileRecordId);
 
       // Map Airtable fields back to frontend keys
       const data: any = {};
-      for (const [key, value] of Object.entries(perfilRecord.fields)) {
+      for (const [key, value] of Object.entries(profileRecord.fields)) {
         const frontendKey = reverseFieldMapping[key];
         if (frontendKey) {
           if (frontendKey === 'photo' && Array.isArray(value) && value.length > 0) {
@@ -350,8 +350,8 @@ async function startServer() {
       }
 
       // Generate vCard string
-      const relationshipContext = data.relationship ? `Conocido por: ${data.relationship}` : '';
-      const userNoteContext = data.customNote ? `Recuérdame: ${data.customNote}` : '';
+      const relationshipContext = data.relationship ? `Met at: ${data.relationship}` : '';
+      const userNoteContext = data.customNote ? `Remember me: ${data.customNote}` : '';
       const combinedNotes = [relationshipContext, userNoteContext].filter(Boolean).join(' | ');
 
       const fullPhoneWork = data.phoneWork ? `${data.phoneWorkPrefix || ''}${data.phoneWork.replace(/\\s+/g, '')}` : '';
@@ -374,7 +374,7 @@ async function startServer() {
         fullPhoneMobile ? `TEL;TYPE=CELL,VOICE:${fullPhoneMobile}` : '',
         data.street || data.city || data.state || data.zip || data.country ? `ADR;TYPE=WORK:;;${data.street || ''};${data.city || ''};${data.state || ''};${data.zip || ''};${data.country || ''}` : '',
         mapsUrl ? `item1.URL:${mapsUrl}` : '',
-        mapsUrl ? `item1.X-ABLabel:Como llegar` : '',
+        mapsUrl ? `item1.X-ABLabel:Directions` : '',
         data.linkedin ? `X-SOCIALPROFILE;TYPE=linkedin:${data.linkedin}` : '',
         data.instagram ? `X-SOCIALPROFILE;TYPE=instagram:${data.instagram}` : '',
         data.x ? `X-SOCIALPROFILE;TYPE=twitter:${data.x}` : '',
@@ -388,7 +388,7 @@ async function startServer() {
       const vCardString = lines.filter(line => line !== '').join('\\n');
 
       res.setHeader('Content-Type', 'text/vcard;charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="${data.firstName || 'contacto'}_${data.lastName || ''}.vcf"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${data.firstName || 'contact'}_${data.lastName || ''}.vcf"`);
       res.send(vCardString);
     } catch (error) {
       console.error("Error generating vCard from Airtable:", error);
