@@ -385,7 +385,7 @@ async function startServer() {
         'END:VCARD'
       ];
 
-      const vCardString = lines.filter(line => line !== '').join('\\n');
+      const vCardString = lines.filter(line => line !== '').join('\r\n') + '\r\n';
 
       res.setHeader('Content-Type', 'text/vcard;charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="${data.firstName || 'contact'}_${data.lastName || ''}.vcf"`);
