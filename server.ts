@@ -407,7 +407,7 @@ async function startServer() {
   } else {
     app.use(express.static(path.join(__dirname, "dist")));
 
-    app.get("/*", (req, res) => {
+    app.use((req, res) => {
       if (req.path.startsWith("/api/")) {
         return res.status(404).send("API route not found");
       }
