@@ -308,7 +308,7 @@ async function startServer() {
   });
 
   // API endpoint to download vCard directly
-  app.get("/:public_id/vcard", async (req, res) => {
+  app.get("/api/profile/:public_id/vcard", async (req, res) => {
     try {
       const { public_id } = req.params;
 
