@@ -259,7 +259,7 @@ async function startServer() {
   });
 
   // API endpoint to get a profile by public_id
-  app.get("/:public_id", async (req, res) => {
+  app.get("/api/profile/:public_id", async (req, res) => {
     try {
       const { public_id } = req.params;
 
