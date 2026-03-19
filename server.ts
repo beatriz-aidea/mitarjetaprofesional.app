@@ -68,7 +68,7 @@ async function startServer() {
   );
 
   // Fields that should not be sent to Airtable during create/update
-  const readOnlyFields = ["photo", "mapsUrl", "relationship", "observations", "customNote"];
+  const readOnlyFields = ["photo", "mapsUrl", "relationship", "observations"];
 
   // --- AUTHENTICATION ENDPOINTS ---
 
@@ -212,6 +212,25 @@ async function startServer() {
         }
       }
 
+      // Enforce one record per email by deleting any existing profiles with this email
+      const emailFormValue = mappedData["Email"];
+      if (emailFormValue) {
+        const existingProfiles = await base(profilesTable).select({
+          filterByFormula: `{Email} = '${emailFormValue}'`
+        }).all();
+
+        for (const profile of existingProfiles) {
+          const sysRecords = await base(systemTable).select({
+            filterByFormula: `FIND('${profile.id}', {Perfil} & '')`
+          }).all();
+          
+          for (const sys of sysRecords) {
+            await base(systemTable).destroy([sys.id]).catch(err => console.error("Error deleting system record:", err));
+          }
+          await base(profilesTable).destroy([profile.id]).catch(err => console.error("Error deleting profile record:", err));
+        }
+      }
+
       // If no existing public_id or record not found, create a new one
       const public_id = generatePublicId();
 
@@ -350,8 +369,8 @@ async function startServer() {
       }
 
       // Generate vCard string
-      const relationshipContext = data.relationship ? `Met at: ${data.relationship}` : '';
-      const userNoteContext = data.customNote ? `Remember me: ${data.customNote}` : '';
+      const relationshipContext = data.relationship ? `Contexto: ${data.relationship}` : '';
+      const userNoteContext = data.customNote ? `Contexto de red: ${data.customNote}` : '';
       const combinedNotes = [relationshipContext, userNoteContext].filter(Boolean).join(' | ');
 
       const fullPhoneWork = data.phoneWork ? `${data.phoneWorkPrefix || ''}${data.phoneWork.replace(/\\s+/g, '')}` : '';
