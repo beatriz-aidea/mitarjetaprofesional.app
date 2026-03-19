@@ -1,31 +1,28 @@
-# Build stage
-FROM node:20-slim AS builder
-
+# Etapa 1: Construir la aplicación
+FROM node:18 AS build
 WORKDIR /app
 
-# Install dependencies
-COPY package*.json ./
-RUN npm ci
+# Copiamos archivos de dependencias
+COPY package*.json package-lock.json* ./
+RUN npm install
 
-# Copy source code and build
+# Copiamos todo el código y construimos
 COPY . .
 RUN npm run build
 
-# Production stage
-FROM node:20-slim
-
+# Etapa 2: Preparar entorno de producción
+FROM node:18-slim
 WORKDIR /app
 
-# Copy package files and install only production dependencies
-COPY package*.json ./
-RUN npm ci --omit=dev
+# Copiamos solo lo necesario para producción
+COPY --from=build /app/package*.json ./
+COPY --from=build /app/dist ./dist
+# Si server.ts está en la raíz, lo copiamos también
+COPY --from=build /app/server.ts ./
+# Instalamos solo dependencias de producción (para que tsx esté disponible)
+RUN npm install --only=production
 
-# Copy built assets and server file
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/server.ts ./
-
-# Variables de entorno por defecto (Cloud Run inyectará el PORT)
-ENV NODE_ENV=production
 EXPOSE 8080
 
+# Usamos el script "start" de tu package.json
 CMD ["npm", "start"]

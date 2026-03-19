@@ -20,17 +20,6 @@ const DYNAMIC_PRICING_OPTIONS = [
 ];
 
 const Generator: React.FC = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  useEffect(() => {
-    setIsLoggedIn(!!localStorage.getItem('token'));
-  }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('userEmail');
-    setIsLoggedIn(false);
-  };
 
   const [cardType, setCardType] = useState<CardType>('static');
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
@@ -247,24 +236,6 @@ const Generator: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#0F1022] text-[#FAF7F5] pb-20 relative">
-      <div className="absolute top-6 right-6 z-50">
-        {!isLoggedIn ? (
-          <Link 
-            to="/login"
-            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-xs font-bold uppercase tracking-widest text-white/70 hover:bg-white/10 hover:text-white transition-all shadow-lg backdrop-blur-md"
-          >
-            <Lock size={14} className="text-[#D61E51]"/> Acceso usuarios
-          </Link>
-        ) : (
-          <button 
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-xs font-bold uppercase tracking-widest text-white/70 hover:bg-[#D61E51]/20 hover:text-[#D61E51] hover:border-[#D61E51]/30 transition-all shadow-lg backdrop-blur-md"
-          >
-            <Lock size={14} className="text-[#D61E51]"/> Cerrar Sesión
-          </button>
-        )}
-      </div>
-
       <header className="max-w-4xl mx-auto px-6 py-10 lg:py-16 text-center flex flex-col items-center">
         <img src={logoMitarjeta} alt="Mi Tarjeta VCard Logo" className="h-24 lg:h-36 mb-6" />
         <div className="flex flex-col md:flex-row justify-center items-center gap-6 lg:gap-8 mt-12 lg:mt-16">
