@@ -1,0 +1,42 @@
+{
+  "entities": {
+    "Perfil": {
+      "title": "Perfil",
+      "description": "A user's professional profile",
+      "type": "object",
+      "properties": {
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "organization": { "type": "string" },
+        "title": { "type": "string" },
+        "phoneWork": { "type": "string" },
+        "phoneWorkPrefix": { "type": "string" },
+        "phoneMobile": { "type": "string" },
+        "phoneMobilePrefix": { "type": "string" },
+        "email": { "type": "string" },
+        "url": { "type": "string" },
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "zip": { "type": "string" },
+        "country": { "type": "string" },
+        "linkedin": { "type": "string" },
+        "instagram": { "type": "string" },
+        "twitter": { "type": "string" },
+        "tiktok": { "type": "string" },
+        "x": { "type": "string" },
+        "photo": { "type": "string" },
+        "mapsUrl": { "type": "string" },
+        "public_id": { "type": "string" },
+        "uid": { "type": "string" }
+      },
+      "required": ["public_id", "uid"]
+    }
+  },
+  "firestore": {
+    "/perfiles/{public_id}": {
+      "schema": { "$ref": "#/entities/Perfil" },
+      "description": "Stores user profiles"
+    }
+  }
+}

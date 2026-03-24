@@ -115,6 +115,88 @@ const VCardForm: React.FC<VCardFormProps> = ({ data, onChange, cardType }) => {
         <h2 className="text-lg lg:text-xl font-bold text-[#FAF7F5] mb-6 lg:mb-8 flex items-center gap-3">
           <User className="text-[#D61E51]" size={20} /> Identidad Profesional
         </h2>
+        
+        {cardType === 'dynamic' && (
+          <div className="mb-8">
+            <label className="block text-[10px] lg:text-xs font-semibold text-[#FAF7F5]/50 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <User size={14} className="text-[#D61E51]" />
+              Foto / Logo (Opcional)
+            </label>
+            <div className="flex items-center gap-4">
+              {data.photo ? (
+                <div className="relative">
+                  <img src={data.photo} alt="Profile" className="w-16 h-16 rounded-full object-cover border-2 border-[#D61E51]" />
+                  <button 
+                    onClick={() => onChange({ ...data, photo: null })}
+                    className="absolute -top-1 -right-1 bg-[#D61E51] text-white rounded-full p-1 hover:bg-[#b51844] transition-colors"
+                  >
+                    <ChevronDown size={12} className="rotate-45" />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-[#FAF7F5]/5 border border-[#FAF7F5]/10 flex items-center justify-center text-[#FAF7F5]/20">
+                  <User size={24} />
+                </div>
+              )}
+              <div className="flex-1">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                          const canvas = document.createElement('canvas');
+                          let width = img.width;
+                          let height = img.height;
+                          const maxSize = 400; // Resize to max 400px to keep base64 small
+                          
+                          if (width > height) {
+                            if (width > maxSize) {
+                              height *= maxSize / width;
+                              width = maxSize;
+                            }
+                          } else {
+                            if (height > maxSize) {
+                              width *= maxSize / height;
+                              height = maxSize;
+                            }
+                          }
+                          
+                          canvas.width = width;
+                          canvas.height = height;
+                          const ctx = canvas.getContext('2d');
+                          if (ctx) {
+                            ctx.drawImage(img, 0, 0, width, height);
+                            // Compress as JPEG with 0.8 quality
+                            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                            onChange({ ...data, photo: compressedBase64 });
+                          }
+                        };
+                        img.src = event.target?.result as string;
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  className="hidden"
+                  id="photo-upload"
+                />
+                <label 
+                  htmlFor="photo-upload"
+                  className="inline-block px-4 py-2 bg-[#FAF7F5]/5 border border-[#FAF7F5]/10 rounded-xl text-xs font-bold uppercase tracking-widest text-[#FAF7F5]/70 hover:bg-[#FAF7F5]/10 cursor-pointer transition-all"
+                >
+                  Subir Imagen
+                </label>
+                <p className="text-[10px] text-[#FAF7F5]/30 mt-2 font-bold uppercase tracking-widest">
+                  Formatos: JPG, PNG. Máx 5MB.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
           <InputGroup label="Nombre" name="firstName" value={data.firstName} onChange={handleInputChange} icon={User} placeholder="Ej. Javier" />

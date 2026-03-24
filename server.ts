@@ -1,11 +1,12 @@
 import express from "express";
+import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
-import Airtable from "airtable";
 import { customAlphabet } from "nanoid";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import fs from "fs";
 
 dotenv.config();
 
@@ -13,364 +14,120 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const generatePublicId = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', 12);
-const JWT_SECRET = process.env.JWT_SECRET || 'aidea-vcard-secret-key-2025';
+
+// Initialize Firebase Client SDK
+let db: any;
+try {
+  const configPath = path.join(__dirname, 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    const app = initializeApp(config);
+    
+    db = getFirestore(app, config.firestoreDatabaseId);
+    
+    console.log("Firebase Client SDK initialized successfully.");
+  } else {
+    console.error("firebase-applet-config.json not found.");
+  }
+} catch (error) {
+  console.error("Failed to initialize Firebase Client SDK:", error);
+}
 
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
+  const PORT = 3000;
 
   app.use(express.json({ limit: '10mb' }));
 
-  // Airtable configuration
-  const apiKey = process.env.AIRTABLE_API_KEY;
-  const baseId = process.env.AIRTABLE_BASE_ID;
-
-  if (!apiKey || !baseId) {
-    console.error("CRITICAL ERROR: AIRTABLE_API_KEY or AIRTABLE_BASE_ID is not set in the environment.");
-  }
-
-  const base = new Airtable({ apiKey: apiKey || 'dummy_key' }).base(baseId || 'dummy_base');
-  const profilesTable = process.env.AIRTABLE_TABLE_PERFILES || 'Perfiles';
-  const systemTable = process.env.AIRTABLE_TABLE_SISTEMA || 'Perfil_Sistema';
-  const usersTable = process.env.AIRTABLE_TABLE_USUARIOS || 'Usuarios';
-
-  // Field mapping between frontend keys and Airtable column names
-  const fieldMapping: Record<string, string> = {
-    firstName: "Nombre",
-    lastName: "Apellidos",
-    organization: "Empresa",
-    title: "Cargo",
-    phoneWork: "Telefono Trabajo",
-    phoneWorkPrefix: "Prefijo Trabajo",
-    phoneMobile: "Telefono Movil",
-    phoneMobilePrefix: "Prefijo Movil",
-    email: "Email",
-    url: "Sitio Web",
-    street: "Calle",
-    city: "Ciudad",
-    state: "Provincia",
-    zip: "Codigo Postal",
-    country: "Pais",
-    relationship: "Relacion",
-    customNote: "Nota Personal",
-    observations: "Observaciones",
-    linkedin: "LinkedIn",
-    instagram: "Instagram",
-    twitter: "Twitter",
-    tiktok: "TikTok",
-    x: "X",
-    photo: "Foto",
-    mapsUrl: "Maps URL"
-  };
-
-  const reverseFieldMapping: Record<string, string> = Object.fromEntries(
-    Object.entries(fieldMapping).map(([k, v]) => [v, k])
-  );
-
-  // Fields that should not be sent to Airtable during create/update
-  const readOnlyFields = ["photo", "mapsUrl", "relationship", "observations"];
-
-  // --- AUTHENTICATION ENDPOINTS ---
-
-  app.post("/api/auth/register", async (req, res) => {
-    try {
-      const { email, password } = req.body;
-
-      if (!email || !password) {
-        return res.status(400).json({ error: "Email and password are required" });
-      }
-
-      // Check if user exists
-      const existingUsers = await base(usersTable).select({
-        filterByFormula: `{Email} = '${email}'`,
-        maxRecords: 1
-      }).firstPage();
-
-      if (existingUsers.length > 0) {
-        return res.status(400).json({ error: "This email is already registered" });
-      }
-
-      // Hash password
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
-
-      // Create user
-      const record = await base(usersTable).create([
-        {
-          fields: {
-            Email: email,
-            Password: hashedPassword
-          }
-        }
-      ]);
-
-      const token = jwt.sign({ id: record[0].id, email }, JWT_SECRET, { expiresIn: '7d' });
-
-      res.status(201).json({
-        message: "User registered successfully",
-        token,
-        user: { id: record[0].id, email }
-      });
-    } catch (error: any) {
-      console.error("Error registering user:", error);
-      res.status(500).json({ error: "Internal error registering user" });
-    }
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", env: process.env.NODE_ENV });
   });
-
-  app.post("/api/auth/login", async (req, res) => {
-    try {
-      const { email, password } = req.body;
-
-      if (!email || !password) {
-        return res.status(400).json({ error: "Email and password are required" });
-      }
-
-      // Find user
-      const users = await base(usersTable).select({
-        filterByFormula: `{Email} = '${email}'`,
-        maxRecords: 1
-      }).firstPage();
-
-      if (users.length === 0) {
-        return res.status(401).json({ error: "Invalid credentials" });
-      }
-
-      const userRecord = users[0];
-      const storedPassword = userRecord.get('Password') as string;
-
-      if (!storedPassword) {
-        return res.status(401).json({ error: "Invalid credentials" });
-      }
-
-      // Verify password
-      const isMatch = await bcrypt.compare(password, storedPassword);
-
-      if (!isMatch) {
-        return res.status(401).json({ error: "Invalid credentials" });
-      }
-
-      const token = jwt.sign({ id: userRecord.id, email }, JWT_SECRET, { expiresIn: '7d' });
-
-      res.json({
-        message: "Login successful",
-        token,
-        user: { id: userRecord.id, email }
-      });
-    } catch (error) {
-      console.error("Error logging in:", error);
-      res.status(500).json({ error: "Internal error logging in" });
-    }
-  });
-
-  // --- VCARD ENDPOINTS ---
 
   // API endpoint to create or update a profile
-  app.post("/api/profile", async (req, res) => {
+  app.post("/api/perfil", async (req, res) => {
     try {
+      if (!db) throw new Error("Database not initialized");
+      
       const formData = req.body;
       const { public_id: existingPublicId, ...profileData } = formData;
-
+      
       // Clean formData to remove empty strings and undefined values
       const cleanFormData = Object.fromEntries(
-        Object.entries(profileData).filter(([k, v]) => v !== '' && v !== null && v !== undefined && !readOnlyFields.includes(k))
+        Object.entries(profileData).filter(([k, v]) => v !== '' && v !== null && v !== undefined)
       );
 
-      // Map to Airtable fields
-      const mappedData: any = {};
-      for (const [key, value] of Object.entries(cleanFormData)) {
-        const airtableField = fieldMapping[key];
-        if (airtableField) {
-          mappedData[airtableField] = value;
+      let public_id = existingPublicId;
+
+      if (public_id) {
+        // Update existing
+        const docRef = doc(db, 'perfiles', public_id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          await updateDoc(docRef, cleanFormData);
+        } else {
+          // If it doesn't exist, create it with this ID
+          await setDoc(docRef, { ...cleanFormData, public_id });
         }
+      } else {
+        // Create new
+        public_id = generatePublicId();
+        const docRef = doc(db, 'perfiles', public_id);
+        await setDoc(docRef, { ...cleanFormData, public_id });
       }
-
-      // If we already have a public_id, try to update the existing record
-      if (existingPublicId) {
-        const systemRecords = await base(systemTable).select({
-          filterByFormula: `{public_id} = '${existingPublicId}'`,
-          maxRecords: 1
-        }).firstPage();
-
-        if (systemRecords.length > 0) {
-          const profileIds = systemRecords[0].get('Perfil') as string[];
-          if (profileIds && profileIds.length > 0) {
-            await base(profilesTable).update([
-              {
-                id: profileIds[0],
-                fields: mappedData
-              }
-            ]);
-
-            // Use APP_URL in AI Studio preview, otherwise use PUBLIC_BASE_URL or host
-            const baseUrl = process.env.APP_URL || process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
-            return res.json({
-              public_id: existingPublicId,
-              landing_url: `${baseUrl}/${existingPublicId}`,
-              profileRecordId: profileIds[0]
-            });
-          }
-        }
-      }
-
-      // Enforce one record per email by deleting any existing profiles with this email
-      const emailFormValue = mappedData["Email"];
-      if (emailFormValue) {
-        const existingProfiles = await base(profilesTable).select({
-          filterByFormula: `{Email} = '${emailFormValue}'`
-        }).all();
-
-        for (const profile of existingProfiles) {
-          const sysRecords = await base(systemTable).select({
-            filterByFormula: `FIND('${profile.id}', {Perfil} & '')`
-          }).all();
-          
-          for (const sys of sysRecords) {
-            await base(systemTable).destroy([sys.id]).catch(err => console.error("Error deleting system record:", err));
-          }
-          await base(profilesTable).destroy([profile.id]).catch(err => console.error("Error deleting profile record:", err));
-        }
-      }
-
-      // If no existing public_id or record not found, create a new one
-      const public_id = generatePublicId();
-
-      // Create record in Perfiles
-      const profilesRecord = await base(profilesTable).create([
-        {
-          fields: mappedData
-        }
-      ]);
-      const profileRecordId = profilesRecord[0].id;
-
-      // Create record in Perfil_Sistema
-      await base(systemTable).create([
-        {
-          fields: {
-            Perfil: [profileRecordId],
-            public_id: public_id,
-            estado_publicacion: "publicado"
-          }
-        }
-      ]);
 
       // Construct final URL
-      // Use APP_URL in AI Studio preview, otherwise use PUBLIC_BASE_URL or host
       const baseUrl = process.env.APP_URL || process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
       const landing_url = `${baseUrl}/${public_id}`;
 
       // Return response
       res.json({
         public_id,
-        landing_url,
-        profileRecordId
+        landing_url
       });
     } catch (error: any) {
-      console.error("Error creating profile in Airtable:", error);
-      console.error("Error details:", JSON.stringify(error, null, 2));
-
-      let errorMessage = "Failed to create profile";
-      if (error.error === 'NOT_FOUND') {
-        errorMessage = "Airtable Base ID or Table Name not found, or API key lacks access.";
-      }
-
-      res.status(500).json({ error: errorMessage, details: error.message || error });
+      console.error("Error creating profile in Firebase:", error);
+      res.status(500).json({ error: "Failed to create profile", details: error.message || error });
     }
   });
 
   // API endpoint to get a profile by public_id
-  app.get("/api/profile/:public_id", async (req, res) => {
+  app.get("/api/perfil/:public_id", async (req, res) => {
     try {
+      if (!db) throw new Error("Database not initialized");
+      
       const { public_id } = req.params;
+      const docRef = doc(db, 'perfiles', public_id);
+      const docSnap = await getDoc(docRef);
 
-      // Find in Perfil_Sistema
-      const systemRecords = await base(systemTable).select({
-        filterByFormula: `{public_id} = '${public_id}'`,
-        maxRecords: 1
-      }).firstPage();
-
-      if (systemRecords.length === 0) {
+      if (!docSnap.exists()) {
         return res.status(404).json({ error: "Profile not found" });
       }
 
-      const systemRecord = systemRecords[0];
-      const profileIds = systemRecord.get('Perfil') as string[];
-
-      if (!profileIds || profileIds.length === 0) {
-        return res.status(404).json({ error: "Linked profile not found" });
-      }
-
-      const profileRecordId = profileIds[0];
-
-      // Fetch from Perfiles
-      const profileRecord = await base(profilesTable).find(profileRecordId);
-
-      // Map Airtable fields back to frontend keys
-      const mappedResponse: any = {};
-      for (const [key, value] of Object.entries(profileRecord.fields)) {
-        const frontendKey = reverseFieldMapping[key];
-        if (frontendKey) {
-          if (frontendKey === 'photo' && Array.isArray(value) && value.length > 0) {
-            mappedResponse[frontendKey] = value[0].url;
-          } else {
-            mappedResponse[frontendKey] = value;
-          }
-        } else {
-          mappedResponse[key] = value;
-        }
-      }
-
-      res.json(mappedResponse);
+      res.json(docSnap.data());
     } catch (error) {
-      console.error("Error fetching profile from Airtable:", error);
+      console.error("Error fetching profile from Firebase:", error);
       res.status(500).json({ error: "Failed to fetch profile" });
     }
   });
 
   // API endpoint to download vCard directly
-  app.get("/api/profile/:public_id/vcard", async (req, res) => {
+  app.get("/api/perfil/:public_id/vcard", async (req, res) => {
     try {
+      if (!db) throw new Error("Database not initialized");
+      
       const { public_id } = req.params;
+      const docRef = doc(db, 'perfiles', public_id);
+      const docSnap = await getDoc(docRef);
 
-      // Find in Perfil_Sistema
-      const systemRecords = await base(systemTable).select({
-        filterByFormula: `{public_id} = '${public_id}'`,
-        maxRecords: 1
-      }).firstPage();
-
-      if (systemRecords.length === 0) {
+      if (!docSnap.exists()) {
         return res.status(404).json({ error: "Profile not found" });
       }
 
-      const systemRecord = systemRecords[0];
-      const profileIds = systemRecord.get('Perfil') as string[];
-
-      if (!profileIds || profileIds.length === 0) {
-        return res.status(404).json({ error: "Linked profile not found" });
-      }
-
-      const profileRecordId = profileIds[0];
-
-      // Fetch from Perfiles
-      const profileRecord = await base(profilesTable).find(profileRecordId);
-
-      // Map Airtable fields back to frontend keys
-      const data: any = {};
-      for (const [key, value] of Object.entries(profileRecord.fields)) {
-        const frontendKey = reverseFieldMapping[key];
-        if (frontendKey) {
-          if (frontendKey === 'photo' && Array.isArray(value) && value.length > 0) {
-            data[frontendKey] = value[0].url;
-          } else {
-            data[frontendKey] = value;
-          }
-        } else {
-          data[key] = value;
-        }
-      }
+      const data: any = docSnap.data();
 
       // Generate vCard string
-      const relationshipContext = data.relationship ? `Contexto: ${data.relationship}` : '';
-      const userNoteContext = data.customNote ? `Contexto de red: ${data.customNote}` : '';
+      const relationshipContext = data.relationship ? `Conocido por: ${data.relationship}` : '';
+      const userNoteContext = data.customNote ? `Recuérdame: ${data.customNote}` : '';
       const combinedNotes = [relationshipContext, userNoteContext].filter(Boolean).join(' | ');
 
       const fullPhoneWork = data.phoneWork ? `${data.phoneWorkPrefix || ''}${data.phoneWork.replace(/\\s+/g, '')}` : '';
@@ -380,58 +137,91 @@ async function startServer() {
       const addressString = addressParts.join(', ');
       const mapsUrl = addressString ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressString)}` : '';
 
+      const escapeVCardText = (text: string) => {
+        if (!text) return '';
+        return text.replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\n/g, '\\n');
+      };
+
+      const formatUrl = (url: string) => {
+        if (!url) return '';
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          return `https://${url}`;
+        }
+        return url;
+      };
+
       const lines = [
         'BEGIN:VCARD',
         'VERSION:3.0',
-        `N:${data.lastName || ''};${data.firstName || ''};;;`,
-        `FN:${data.firstName || ''} ${data.lastName || ''}`,
-        data.organization ? `ORG:${data.organization}` : '',
-        data.title ? `TITLE:${data.title}` : '',
+        `N:${escapeVCardText(data.lastName || '')};${escapeVCardText(data.firstName || '')};;;`,
+        `FN:${escapeVCardText(data.firstName || '')} ${escapeVCardText(data.lastName || '')}`,
+        data.organization ? `ORG:${escapeVCardText(data.organization)}` : '',
+        data.title ? `TITLE:${escapeVCardText(data.title)}` : '',
         data.email ? `EMAIL;TYPE=INTERNET,WORK:${data.email}` : '',
-        data.url ? `URL;TYPE=WORK:${data.url}` : '',
+        data.url ? `URL;TYPE=WORK:${formatUrl(data.url)}` : '',
         fullPhoneWork ? `TEL;TYPE=WORK,VOICE:${fullPhoneWork}` : '',
         fullPhoneMobile ? `TEL;TYPE=CELL,VOICE:${fullPhoneMobile}` : '',
-        data.street || data.city || data.state || data.zip || data.country ? `ADR;TYPE=WORK:;;${data.street || ''};${data.city || ''};${data.state || ''};${data.zip || ''};${data.country || ''}` : '',
+        data.street || data.city || data.state || data.zip || data.country ? `ADR;TYPE=WORK:;;${escapeVCardText(data.street || '')};${escapeVCardText(data.city || '')};${escapeVCardText(data.state || '')};${escapeVCardText(data.zip || '')};${escapeVCardText(data.country || '')}` : '',
         mapsUrl ? `item1.URL:${mapsUrl}` : '',
-        mapsUrl ? `item1.X-ABLabel:Directions` : '',
-        data.linkedin ? `X-SOCIALPROFILE;TYPE=linkedin:${data.linkedin}` : '',
-        data.instagram ? `X-SOCIALPROFILE;TYPE=instagram:${data.instagram}` : '',
-        data.x ? `X-SOCIALPROFILE;TYPE=twitter:${data.x}` : '',
-        data.tiktok ? `X-SOCIALPROFILE;TYPE=tiktok:${data.tiktok}` : '',
-        data.photo ? `PHOTO;ENCODING=b;TYPE=JPEG:${data.photo.split(',')[1]}` : '',
+        mapsUrl ? `item1.X-ABLabel:Como llegar` : '',
+        data.linkedin ? `X-SOCIALPROFILE;TYPE=linkedin:${formatUrl(data.linkedin)}` : '',
+        data.instagram ? `X-SOCIALPROFILE;TYPE=instagram:${formatUrl(data.instagram)}` : '',
+        data.x ? `X-SOCIALPROFILE;TYPE=twitter:${formatUrl(data.x)}` : '',
+        data.tiktok ? `X-SOCIALPROFILE;TYPE=tiktok:${formatUrl(data.tiktok)}` : '',
+        data.photo ? `PHOTO;VALUE=URI:${data.photo}` : '',
         data.public_id ? `UID:${data.public_id}` : '',
-        combinedNotes ? `NOTE:${combinedNotes.replace(/\\n/g, '\\\\n')}` : '',
+        combinedNotes ? `NOTE:${escapeVCardText(combinedNotes)}` : '',
         'END:VCARD'
       ];
 
-      const vCardString = lines.filter(line => line !== '').join('\r\n') + '\r\n';
+      const foldLine = (line: string) => {
+        if (line.length <= 75) return line;
+        let folded = '';
+        let currentLine = line;
+        while (currentLine.length > 75) {
+          folded += currentLine.substring(0, 75) + '\r\n ';
+          currentLine = currentLine.substring(75);
+        }
+        folded += currentLine;
+        return folded;
+      };
+
+      const vCardString = lines.filter(line => line !== '').map(foldLine).join('\r\n');
 
       res.setHeader('Content-Type', 'text/vcard;charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="${data.firstName || 'contact'}_${data.lastName || ''}.vcf"`);
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Content-Disposition', `attachment; filename="${data.firstName || 'contacto'}_${data.lastName || ''}.vcf"`);
       res.send(vCardString);
     } catch (error) {
-      console.error("Error generating vCard from Airtable:", error);
+      console.error("Error generating vCard from Firebase:", error);
       res.status(500).json({ error: "Failed to generate vCard" });
     }
   });
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
-    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
-    app.use(express.static(path.join(__dirname, "dist")));
-
-    app.use((req, res) => {
-      if (req.path.startsWith("/api/")) {
-        return res.status(404).send("API route not found");
+    
+    app.use(async (req, res, next) => {
+      try {
+        const url = req.originalUrl;
+        let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e) {
+        vite.ssrFixStacktrace(e as Error);
+        next(e);
       }
-
-      res.sendFile(path.join(__dirname, "dist", "index.html"));
+    });
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.use((req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 

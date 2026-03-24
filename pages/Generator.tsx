@@ -1,8 +1,6 @@
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useCallback, useRef } from 'react';
 import { VCardData, QRSettings, OrderData, CardType } from '../types';
-import logoMitarjeta from '../components/logoMItarjetaVCARD_INV.svg';
 import VCardForm from '../components/VCardForm';
 import QRPreview from '../components/QRPreview';
 import { generateVCardString } from '../services/vCardHelper';
@@ -20,7 +18,6 @@ const DYNAMIC_PRICING_OPTIONS = [
 ];
 
 const Generator: React.FC = () => {
-
   const [cardType, setCardType] = useState<CardType>('static');
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
@@ -87,7 +84,7 @@ const Generator: React.FC = () => {
     setIsSaving(true);
     setDynamicError(null);
     try {
-      const response = await fetch('/api/profile', {
+      const response = await fetch('/api/perfil', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(vCardData),
@@ -235,9 +232,11 @@ const Generator: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#0F1022] text-[#FAF7F5] pb-20 relative">
-      <header className="max-w-4xl mx-auto px-6 py-10 lg:py-16 text-center flex flex-col items-center">
-        <img src={logoMitarjeta} alt="Mi Tarjeta VCard Logo" className="h-24 lg:h-36 mb-6" />
+    <div className="min-h-screen bg-[#0F1022] text-[#FAF7F5] pb-20">
+      <header className="max-w-4xl mx-auto px-6 py-10 lg:py-16 text-center">
+        <div className="flex justify-center mb-6">
+          <img src="/logoQr.svg" alt="Logo QR" className="h-24 md:h-32 lg:h-40 object-contain" />
+        </div>
         <div className="flex flex-col md:flex-row justify-center items-center gap-6 lg:gap-8 mt-12 lg:mt-16">
            <div className="flex flex-col items-center gap-4 group cursor-pointer w-full md:w-auto">
               <button 
@@ -487,7 +486,14 @@ const Generator: React.FC = () => {
             <a href="mailto:info@aidea.es" className="hover:text-[#D61E51] transition-colors">info@aidea.es</a>
             <button onClick={() => setShowPrivacyModal(true)} className="hover:text-[#D61E51] transition-colors">Aviso Legal</button>
           </div>
-          <p className="text-sm font-black tracking-[0.3em] text-white/40 uppercase">AIDEA @2025</p>
+          <a 
+            href="https://www.aidea.es" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-sm font-black tracking-[0.3em] text-white/40 uppercase hover:text-[#D61E51] transition-colors"
+          >
+            AIDEA @2025
+          </a>
         </div>
       </footer>
 

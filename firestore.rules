@@ -1,0 +1,90 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: perfiles
+    // Document ID: {public_id}
+    // Fields:
+    //   - firstName: string (optional, max 50)
+    //   - lastName: string (optional, max 50)
+    //   - organization: string (optional, max 100)
+    //   - title: string (optional, max 100)
+    //   - phoneWork: string (optional, max 20)
+    //   - phoneMobile: string (optional, max 20)
+    //   - email: string (optional, max 100)
+    //   - url: string (optional, max 200)
+    //   - public_id: string (required, immutable)
+    //   - uid: string (required, immutable)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+    
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+    
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+    
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function isValidOptionalString(field, maxLen) {
+      return !(field in request.resource.data) || 
+             (request.resource.data[field] is string && request.resource.data[field].size() <= maxLen);
+    }
+
+    function isValidPerfil() {
+      return hasRequiredFields(['public_id', 'uid']) &&
+             request.resource.data.public_id is string &&
+             request.resource.data.public_id.size() > 0 &&
+             request.resource.data.public_id.size() <= 50 &&
+             request.resource.data.uid is string &&
+             isValidOptionalString('firstName', 50) &&
+             isValidOptionalString('lastName', 50) &&
+             isValidOptionalString('organization', 100) &&
+             isValidOptionalString('title', 100) &&
+             isValidOptionalString('phoneWork', 20) &&
+             isValidOptionalString('phoneWorkPrefix', 10) &&
+             isValidOptionalString('phoneMobile', 20) &&
+             isValidOptionalString('phoneMobilePrefix', 10) &&
+             isValidOptionalString('email', 100) &&
+             isValidOptionalString('url', 200) &&
+             isValidOptionalString('street', 100) &&
+             isValidOptionalString('city', 100) &&
+             isValidOptionalString('state', 100) &&
+             isValidOptionalString('zip', 20) &&
+             isValidOptionalString('country', 100) &&
+             isValidOptionalString('linkedin', 200) &&
+             isValidOptionalString('instagram', 200) &&
+             isValidOptionalString('twitter', 200) &&
+             isValidOptionalString('tiktok', 200) &&
+             isValidOptionalString('x', 200) &&
+             isValidOptionalString('photo', 1000000) &&
+             isValidOptionalString('mapsUrl', 500);
+    }
+
+    match /perfiles/{public_id} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+  }
+}

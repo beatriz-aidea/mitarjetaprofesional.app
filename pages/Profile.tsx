@@ -1,18 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { VCardData } from '../types';
-import { Download } from 'lucide-react';
+import { Download, Share2, Check } from 'lucide-react';
 
 const Profile: React.FC = () => {
   const { public_id } = useParams<{ public_id: string }>();
   const [profile, setProfile] = useState<VCardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const response = await fetch(`/api/profile/${public_id}`);
+        const response = await fetch(`/api/perfil/${public_id}`);
         if (!response.ok) {
           throw new Error('Profile not found');
         }
@@ -30,6 +31,27 @@ const Profile: React.FC = () => {
     }
   }, [public_id]);
 
+  const handleShare = async () => {
+    const shareData = {
+      title: `${profile?.firstName} ${profile?.lastName} - Tarjeta Profesional`,
+      text: `Guarda mi contacto profesional: ${profile?.firstName} ${profile?.lastName}`,
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+      } else {
+        // Fallback to copy to clipboard
+        await navigator.clipboard.writeText(window.location.href);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    } catch (err) {
+      console.error('Error sharing:', err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0F1022] flex items-center justify-center">
@@ -42,8 +64,8 @@ const Profile: React.FC = () => {
     return (
       <div className="min-h-screen bg-[#0F1022] flex items-center justify-center text-[#FAF7F5]">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-2">Profile not found</h2>
-          <p className="text-[#FAF7F5]/60">The link you followed is invalid or has expired.</p>
+          <h2 className="text-2xl font-bold mb-2">Perfil no encontrado</h2>
+          <p className="text-[#FAF7F5]/60">El enlace que has seguido no es válido o ha expirado.</p>
         </div>
       </div>
     );
@@ -71,21 +93,39 @@ const Profile: React.FC = () => {
             </p>
           )}
 
-          {/* Action Button */}
-          <a
-            href={`/api/profile/${public_id}/vcard`}
-            className="w-full py-4 bg-[#D61E51] text-white font-black text-sm rounded-2xl flex items-center justify-center gap-2 hover:bg-[#b51844] transition-all shadow-lg uppercase tracking-widest"
-          >
-            <Download size={18} />
-            Add Contact
-          </a>
+          {/* Action Buttons */}
+          <div className="flex flex-col gap-3">
+            <a
+              href={`/api/perfil/${public_id}/vcard?t=${Date.now()}`}
+              className="w-full py-4 bg-[#D61E51] text-white font-black text-sm rounded-2xl flex items-center justify-center gap-2 hover:bg-[#b51844] transition-all shadow-lg uppercase tracking-widest"
+            >
+              <Download size={18} />
+              Añadir Contacto
+            </a>
+            
+            <button
+              onClick={handleShare}
+              className="w-full py-4 bg-[#FAF7F5]/10 text-[#FAF7F5] font-black text-sm rounded-2xl flex items-center justify-center gap-2 hover:bg-[#FAF7F5]/20 transition-all uppercase tracking-widest"
+            >
+              {copied ? <Check size={18} className="text-green-400" /> : <Share2 size={18} />}
+              {copied ? '¡Enlace copiado!' : 'Compartir Perfil'}
+            </button>
+          </div>
         </div>
       </div>
       
-      <div className="mt-8 text-center">
+      <div className="mt-8 text-center flex flex-col items-center gap-2">
         <p className="text-[10px] font-black tracking-[0.3em] text-[#FAF7F5]/30 uppercase">
-          mitarjetaprofesional.app
+          mitarjetaprofesional.com
         </p>
+        <a 
+          href="https://www.aidea.es" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-xs font-black tracking-[0.3em] text-white/40 uppercase hover:text-[#D61E51] transition-colors"
+        >
+          AIDEA @2025
+        </a>
       </div>
     </div>
   );

@@ -1,0 +1,15 @@
+BEGIN:VCARD
+VERSION:3.0
+N:RODRIGUEZ;BEATRIZ;;;
+FN:BEATRIZ RODRIGUEZ
+ORG:AIDEA
+TITLE:FUNDADORA
+EMAIL;TYPE=INTERNET,WORK:beatriz@aidea.es
+URL;TYPE=WORK:www.aidea.es
+TEL;TYPE=CELL,VOICE:+34918826655
+ADR;TYPE=WORK:;;Villablanca, 85 Vivero de Empresas ;Madrid;Madrid;28032;España
+item1.URL:https://www.google.com/maps/search/?api=1&query=Villablanca%2C%2085%20Vivero%20de%20Empresas%20%2C%20Madrid%2C%20Madrid%2C%2028032%2C%20Espa%C3%B1a
+item1.X-ABLabel:Como llegar
+X-SOCIALPROFILE;TYPE=linkedin:https://www.linkedin.com/in/beatrizrguez/
+UID:loyg8tpi4pxa
+END:VCARD

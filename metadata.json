@@ -1,5 +1,5 @@
 {
-  "name": "mitarjetaprofesional.app",
+  "name": "mitarjetaprofesional.com",
   "description": "Generador de tarjetas profesionales en formato vcard (estáticas y dinámicas) con integración de códigos QR profesionales.",
   "requestFramePermissions": []
 }
